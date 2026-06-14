@@ -1,0 +1,31 @@
+services:
+  gitvibe:
+    build: .
+    container_name: gitvibe
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: "file:./data/gitvibe.db"
+    volumes:
+      - gitvibe-data:/app/data
+    restart: unless-stopped
+    # Uncomment to talk to an Ollama daemon running on the host:
+    # extra_hosts:
+    #   - "host.docker.internal:host-gateway"
+
+  # Optional local LLM. Run `docker compose --profile ollama up` to include it.
+  ollama:
+    image: ollama/ollama:latest
+    container_name: gitvibe-ollama
+    profiles: ["ollama"]
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-data:/root/.ollama
+    restart: unless-stopped
+
+volumes:
+  gitvibe-data:
+  ollama-data:
