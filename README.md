@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="public/logo.png" alt="GitVibe logo" width="160" />
+
 # ⚡ GitVibe
 
 **Turn any Git repository into an optimal AI coding prompt.**
