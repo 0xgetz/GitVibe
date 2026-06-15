@@ -29,6 +29,7 @@ export async function POST(req: Request) {
   const llmProvider = body?.llmProvider as LLMProvider | undefined;
   const llmModel = body?.llmModel as string | undefined;
   const llmApiKey = body?.llmApiKey as string | undefined;
+  const llmBaseUrl = body?.llmBaseUrl as string | undefined;
 
   if (!analysis?.meta) {
     return NextResponse.json({ error: "Missing `analysis` (run /api/analyze first)" }, { status: 400 });
@@ -40,7 +41,7 @@ export async function POST(req: Request) {
     const provider = llmProvider ?? (process.env.DEFAULT_LLM_PROVIDER as LLMProvider) ?? "ollama";
     try {
       const { system, user } = buildSummaryRequest(analysis);
-      llmSummary = await chat({ provider, model: llmModel, apiKey: llmApiKey }, [
+      llmSummary = await chat({ provider, model: llmModel, apiKey: llmApiKey, baseUrl: llmBaseUrl }, [
         { role: "system", content: system },
         { role: "user", content: user },
       ]);
