@@ -35,19 +35,19 @@ function resolve(cfg: LLMConfig) {
       };
     case "groq":
       return {
-        url: "https://api.groq.com/openai/v1/chat/completions",
+        url: `${cfg.baseUrl ?? env.GROQ_BASE_URL ?? "https://api.groq.com/openai/v1"}/chat/completions`,
         model: cfg.model ?? env.GROQ_MODEL ?? "llama-3.3-70b-versatile",
         key: cfg.apiKey ?? env.GROQ_API_KEY ?? "",
       };
     case "openrouter":
       return {
-        url: "https://openrouter.ai/api/v1/chat/completions",
+        url: `${cfg.baseUrl ?? env.OPENROUTER_BASE_URL ?? "https://openrouter.ai/api/v1"}/chat/completions`,
         model: cfg.model ?? env.OPENROUTER_MODEL ?? "anthropic/claude-3.5-sonnet",
         key: cfg.apiKey ?? env.OPENROUTER_API_KEY ?? "",
       };
     case "anthropic":
       return {
-        url: "https://api.anthropic.com/v1/messages",
+        url: `${cfg.baseUrl ?? env.ANTHROPIC_BASE_URL ?? "https://api.anthropic.com"}/v1/messages`,
         model: cfg.model ?? env.ANTHROPIC_MODEL ?? "claude-3-5-sonnet-latest",
         key: cfg.apiKey ?? env.ANTHROPIC_API_KEY ?? "",
       };
