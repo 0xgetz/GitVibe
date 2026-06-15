@@ -12,6 +12,9 @@ import { cn } from "@/lib/utils";
 import type {
   AnalysisResult, ContextMode, GeneratedPrompt, LLMProvider, Provider, PromptVariant,
 } from "@/lib/types";
+import { SettingsManager } from "@/components/settings-manager";
+import { loadSettings, configuredProviders } from "@/lib/settings";
+import { ALL_LLM_PROVIDERS } from "@/lib/llm/providers";
 
 const MODES: { id: ContextMode; label: string; blurb: string }[] = [
   { id: "quick", label: "Quick", blurb: "README + tree + metadata" },
@@ -59,6 +62,19 @@ export function Studio() {
     }).catch(() => {});
   }, []);
 
+  const [localProviders, setLocalProviders] = React.useState<LLMProvider[]>([]);
+  React.useEffect(() => {
+    const sync = () => setLocalProviders(configuredProviders());
+    sync();
+    window.addEventListener("settings:refresh", sync);
+    return () => window.removeEventListener("settings:refresh", sync);
+  }, []);
+
+  const selectableProviders = React.useMemo<LLMProvider[]>(
+    () => Array.from(new Set([...available, ...localProviders, ...ALL_LLM_PROVIDERS])),
+    [available, localProviders],
+  );
+
   async function analyze() {
     if (!url.trim()) return toast.error("Paste a repository URL first");
     setLoading(true);
@@ -95,6 +111,10 @@ export function Studio() {
         body: JSON.stringify({
           analysis: a, mode, variants: VARIANTS.map((v) => v.id),
           useLlm, llmProvider,
+          ...(() => {
+            const c = loadSettings()[llmProvider];
+            return c ? { llmApiKey: c.apiKey, llmBaseUrl: c.baseUrl, llmModel: c.model } : {};
+          })(),
         }),
       });
       const data = await res.json();
@@ -201,14 +221,14 @@ export function Studio() {
                       value={llmProvider}
                       onChange={(e) => setLlmProvider(e.target.value as LLMProvider)}
                     >
-                      {(available.length ? available : (["ollama", "groq", "openrouter", "anthropic", "openai"] as LLMProvider[])).map((p) => (
+                      {selectableProviders.map((p) => (
                         <option key={p} value={p}>{p}</option>
                       ))}
                     </select>
                   )}
                 </div>
-                {useLlm && !available.length && (
-                  <p className="text-xs text-muted-foreground">No LLM keys detected in env — configure one in .env.</p>
+                {useLlm && !available.includes(llmProvider) && (
+                  <p className="text-xs text-muted-foreground">No key for {llmProvider} in env — add one under “API Keys &amp; Base URLs” below.</p>
                 )}
               </div>
             </div>
@@ -227,6 +247,8 @@ export function Studio() {
           provider={provider}
         />
       )}
+
+      <SettingsManager />
 
       <LibraryPanel />
     </div>
