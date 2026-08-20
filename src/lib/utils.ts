@@ -41,9 +41,33 @@ export function cacheSet(key: string, value: unknown): void {
 
 export function clientIp(req: Request): string {
   const h = req.headers;
-  return (
-    h.get("x-forwarded-for")?.split(",")[0]?.trim() ??
-    h.get("x-real-ip") ??
-    "local"
-  );
+  // Only trust proxy headers when explicitly behind a reverse proxy.
+  // Without TRUST_PROXY=1, a client can spoof X-Forwarded-For to bypass rate limits.
+  if (process.env.TRUST_PROXY === "1") {
+    return h.get("x-forwarded-for")?.split(",")[0]?.trim() ?? h.get("x-real-ip") ?? "local";
+  }
+  return h.get("x-real-ip") ?? "local";
+}
+
+const MAX_BODY_BYTES = Number(process.env.MAX_BODY_BYTES ?? 1_000_000);
+
+/** Read + parse a JSON body with a size cap (guards against OOM from huge payloads). */
+export async function readJson<T = any>(
+  req: Request,
+  maxBytes: number = MAX_BODY_BYTES,
+): Promise<{ ok: true; value: T } | { ok: false; error: string }> {
+  let text: string;
+  try {
+    text = await req.text();
+  } catch {
+    return { ok: false, error: "Failed to read request body" };
+  }
+  if (text.length > maxBytes) {
+    return { ok: false, error: `Request body too large (max ${maxBytes} bytes)` };
+  }
+  try {
+    return { ok: true, value: JSON.parse(text) as T };
+  } catch {
+    return { ok: false, error: "Invalid JSON body" };
+  }
 }

@@ -1,20 +1,18 @@
 import { NextResponse } from "next/server";
 import type { GeneratedPrompt } from "@/lib/types";
+import { readJson } from "@/lib/utils";
 
 export const runtime = "nodejs";
 
 // Export a generated prompt (or a bundle) into various agent-friendly formats.
 // format: md | txt | json | claude | cursor
 export async function POST(req: Request) {
-  let body: any;
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
-  }
+  const bodyRes = await readJson<Record<string, unknown>>(req);
+  if (!bodyRes.ok) return NextResponse.json({ error: bodyRes.error }, { status: 400 });
+  const body = bodyRes.value ?? {};
 
   const format = (body?.format ?? "md") as string;
-  const repo = body?.repoFullName ?? "repository";
+  const repo = typeof body?.repoFullName === "string" ? body.repoFullName : "repository";
   const prompts = (body?.prompts ?? []) as GeneratedPrompt[];
   if (!prompts.length) return NextResponse.json({ error: "No prompts to export" }, { status: 400 });
 

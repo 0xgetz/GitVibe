@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { randomUUID } from "node:crypto";
 import { desc, eq } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
-import { rateLimit, clientIp } from "@/lib/utils";
+import { rateLimit, clientIp, readJson } from "@/lib/utils";
 
 export const runtime = "nodejs";
 
@@ -20,11 +20,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Rate limit exceeded." }, { status: 429 });
   }
   let body: any;
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
-  }
+  const bodyRes = await readJson<Record<string, unknown>>(req);
+  if (!bodyRes.ok) return NextResponse.json({ error: bodyRes.error }, { status: 400 });
+  body = bodyRes.value ?? {};
 
   const required = ["repoFullName", "repoUrl", "provider", "mode", "variant", "title", "content"];
   for (const k of required) {

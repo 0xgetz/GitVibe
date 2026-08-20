@@ -1,4 +1,71 @@
 import type { Provider, RepoRef, RepoMeta, RepoFile, FileContent } from "@/lib/types";
+import { URL } from "node:url";
+import { lookup as dnsLookup } from "node:dns";
+import { promisify } from "node:util";
+
+const lookupAsync = promisify(dnsLookup);
+
+// ─── SSRF guard ─────────────────────────────────────────────────────────────
+
+const PRIVATE_BLOCKS = [
+  "127.0.0.0/8", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16",
+  "169.254.0.0/16", "::1/128", "fc00::/7", "fe80::/10",
+];
+
+function ipToInt(ip: string): number {
+  const parts = ip.split(".");
+  if (parts.length !== 4) return NaN;
+  return parts.reduce((a, b) => (a << 8) + parseInt(b, 10), 0) >>> 0;
+}
+
+function isPrivateIP(ip: string): boolean {
+  const n = ipToInt(ip);
+  if (isNaN(n)) return false;
+  for (const block of PRIVATE_BLOCKS) {
+    const [base, bits] = block.split("/");
+    const mask = ~(2 ** (32 - parseInt(bits)) - 1);
+    if ((n & mask) >>> 0 === (ipToInt(base) & mask) >>> 0) return true;
+  }
+  return false;
+}
+
+/**
+ * Validate a self-hosted host URL: must be http/https, not a private IP,
+ * not a loopback, and not a link-local / metadata service address.
+ */
+export async function validateHost(host: string): Promise<string> {
+  let url: URL;
+  try {
+    url = new URL(host);
+  } catch {
+    throw new Error(`Invalid host URL: "${host}"`);
+  }
+  if (url.protocol !== "http:" && url.protocol !== "https:") {
+    throw new Error(`Host URL must use http or https: "${host}"`);
+  }
+  // Resolve hostname to check for private IPs.
+  try {
+    const addresses = await lookupAsync(url.hostname, { all: true });
+    for (const addr of addresses) {
+      if (addr.family === 4 && isPrivateIP(addr.address)) {
+        throw new Error(`Self-hosted host resolves to a private IP (${addr.address}) — not allowed`);
+      }
+    }
+  } catch (e: any) {
+    // A caught Error here is either our private-IP rejection or a DNS failure;
+    // only rethrow our own guard, swallow genuine DNS errors (string check below still runs).
+    if (e instanceof Error && e.message.includes("private IP")) throw e;
+  }
+  // Also check the string form (for IP literals in the URL).
+  const hostname = url.hostname;
+  if (/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(hostname) && isPrivateIP(hostname)) {
+    throw new Error(`Self-hosted host points to a private IP (${hostname}) — not allowed`);
+  }
+  if (hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1" || hostname === "0.0.0.0") {
+    throw new Error(`Self-hosted host points to loopback — not allowed`);
+  }
+  return host;
+}
 
 // ─── URL parsing ──────────────────────────────────────────────────────────
 
@@ -13,10 +80,10 @@ const HOSTS: Record<string, Provider> = {
  * Supports subpaths via the `/tree/<ref>/<subpath>` GitHub convention and
  * lets callers pass a self-hosted host + provider explicitly.
  */
-export function parseRepoUrl(
+export async function parseRepoUrl(
   input: string,
   opts: { provider?: Provider; host?: string; token?: string; ref?: string; subpath?: string } = {},
-): RepoRef {
+): Promise<RepoRef> {
   const raw = input.trim();
 
   // bare "owner/repo"
@@ -33,6 +100,9 @@ export function parseRepoUrl(
     };
   }
 
+  // Gitea (self-hosted) — host is user-supplied; block SSRF targets.
+  if (opts.host) await validateHost(opts.host);
+
   let url: URL;
   try {
     url = new URL(raw);
@@ -40,9 +110,11 @@ export function parseRepoUrl(
     throw new Error(`Could not parse repository reference: "${input}"`);
   }
 
+  // Known public hosts are fine; unknown hostnames get treated as gitea — validate them too.
   const provider = opts.provider ?? HOSTS[url.hostname] ?? "gitea";
   const host =
     opts.host ?? (HOSTS[url.hostname] ? undefined : `${url.protocol}//${url.host}`);
+  if (host && !HOSTS[url.hostname]) await validateHost(host);
 
   const parts = url.pathname.replace(/^\/+|\/+$/g, "").split("/");
   const owner = parts[0];
@@ -101,10 +173,22 @@ async function getJson(url: string, headers: Record<string, string>) {
     cache: "no-store",
   });
   if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new Error(`Upstream ${res.status} for ${url}: ${body.slice(0, 200)}`);
+    // Surface only status + endpoint, not the upstream body (may contain
+    // internal data from a misconfigured host).
+    throw new Error(`Upstream ${res.status} for ${redactUrl(url)}`);
   }
   return res.json();
+}
+
+/** Strip any query string (tokens/keys can end up in URLs). */
+function redactUrl(url: string): string {
+  try {
+    const u = new URL(url);
+    u.search = "";
+    return u.toString();
+  } catch {
+    return url.split("?")[0];
+  }
 }
 
 const MAX_FILE_BYTES = 200_000;
