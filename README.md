@@ -6,10 +6,23 @@
 
 **Turn any Git repository into an optimal AI coding prompt.**
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Next.js](https://img.shields.io/badge/Next.js-15-black?logo=next.js&logoColor=white)](https://nextjs.org)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.7-blue?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
+[![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)](Dockerfile)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/0xgetz/GitVibe/pulls)
+[![GitHub Stars](https://img.shields.io/github/stars/0xgetz/GitVibe?style=social)](https://github.com/0xgetz/GitVibe)
+[![GitHub Issues](https://img.shields.io/github/issues/0xgetz/GitVibe)](https://github.com/0xgetz/GitVibe/issues)
+[![GitHub Forks](https://img.shields.io/github/forks/0xgetz/GitVibe?style=social)](https://github.com/0xgetz/GitVibe)
+[![Self-hosted](https://img.shields.io/badge/self--hosted-✓-0f9d58)](DEPLOY.md)
+[![No tracking](https://img.shields.io/badge/tracking-none-red)](README.md#privacy)
+
 Paste a GitHub / GitLab / Bitbucket / self-hosted Git URL → get battle-tested prompts
 that let Claude, Cursor, Grok and friends *rebuild, extend, or fork* the project.
 
 100% open-source · self-hostable · zero tracking · MIT
+
+**🌐 Languages:** [English](README.md) · [Bahasa Indonesia](README.id.md) · [简体中文](README.zh-CN.md) · [Español](README.es.md) · [Deutsch](README.de.md)
 
 </div>
 
@@ -47,11 +60,12 @@ GitVibe does more, runs on your own machine, and never phones home:
 - **Prompt library** — save, copy, delete reverse-engineered prompts (local SQLite).
 - **Export** — Markdown, JSON, plain text, `CLAUDE.md`, `.cursorrules`.
 - **Modern UI** — Next.js 15, Tailwind, shadcn-style components, dark mode, fully responsive.
+- **Security-hardened** — SSRF guard on self-hosted hosts, cache-poisoning protection, rate limiting, body-size caps, no tracking.
 
 ## Quick start (Docker)
 
 ```bash
-git clone <your-fork-url> gitvibe && cd gitvibe
+git clone https://github.com/0xgetz/GitVibe.git gitvibe && cd gitvibe
 cp .env.example .env          # optional: add tokens / LLM keys
 docker compose up --build     # → http://localhost:3000
 ```
@@ -71,7 +85,8 @@ cp .env.example .env
 npm run dev                   # → http://localhost:3000
 ```
 
-Requires Node.js 20+ (better-sqlite3 compiles a native binding, so build tools must be present).
+Requires **Node.js 20 or 22 (LTS)** — better-sqlite3 compiles a native binding and the
+toolchain (build tools) must be present. Newer Node releases (e.g. 26) are **not** supported yet.
 
 ## Configuration
 
@@ -81,6 +96,8 @@ Everything is optional — the app boots with zero config. See [`.env.example`](
 - `OLLAMA_BASE_URL`, `GROQ_API_KEY`, `OPENROUTER_API_KEY`, `ANTHROPIC_API_KEY`, `OPENAI_API_KEY` — enable AI architecture summaries. Only the providers you configure show up in the UI.
 - `RATE_LIMIT_MAX`, `RATE_LIMIT_WINDOW_MS` — built-in per-IP rate limit.
 - `MAX_DEEP_FILES` — cap on files read for Deep/Ultra.
+- `TRUST_PROXY` — set to `1` **only** behind a reverse proxy that strips client-supplied `X-Forwarded-For`.
+- `MAX_BODY_BYTES` — max JSON request body size (default 1 MB).
 
 ## How it works
 
